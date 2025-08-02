@@ -99,29 +99,45 @@ struct MenuItemCard: View {
             
             // Кнопка добавления
             Button(action: {
-                // Haptic feedback
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                // Enhanced haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                impactFeedback.prepare()
                 impactFeedback.impactOccurred()
                 
                 cartManager.addToCart(item: item)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.2)) {
                     isAdded = true
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    isAdded = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        isAdded = false
+                    }
                 }
             }) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(isAdded ? Color.green : AppConfig.accentColor)
                         .frame(width: 70, height: 36)
+                        .scaleEffect(isAdded ? 1.1 : 1.0)
+                        .shadow(
+                            color: isAdded ? Color.green.opacity(0.4) : AppConfig.accentColor.opacity(0.3),
+                            radius: isAdded ? 8 : 4,
+                            x: 0,
+                            y: isAdded ? 6 : 2
+                        )
                     
                     HStack(spacing: 4) {
                         Image(systemName: isAdded ? "checkmark" : "plus")
                             .font(.system(size: 14, weight: .semibold))
+                            .scaleEffect(isAdded ? 1.2 : 1.0)
+                            .rotationEffect(.degrees(isAdded ? 360 : 0))
                         
                         if !isAdded {
                             Text("В корзину")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        } else {
+                            Text("Добавлено")
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }

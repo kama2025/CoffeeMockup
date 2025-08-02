@@ -3,6 +3,11 @@ import SwiftUI
 struct CartView: View {
     @ObservedObject var cartManager = ModernCartManager.shared
     @State private var showingOrderConfirmation = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var isAuthenticationError = false
+    @State private var showingLoginView = false
+    @State private var showingRegistrationView = false
     
     var body: some View {
         NavigationStack {
@@ -22,6 +27,29 @@ struct CartView: View {
             Button("OK") { }
         } message: {
             Text("Ваш заказ принят в обработку. Спасибо за покупку!")
+        }
+        .alert(isAuthenticationError ? "Требуется авторизация" : "Ошибка", isPresented: $showingError) {
+            if isAuthenticationError {
+                Button("Войти") { 
+                    showingError = false
+                    showingLoginView = true
+                }
+                Button("Зарегистрироваться") { 
+                    showingError = false
+                    showingRegistrationView = true
+                }
+                Button("Отмена", role: .cancel) { }
+            } else {
+                Button("OK") { }
+            }
+        } message: {
+            Text(errorMessage)
+        }
+        .sheet(isPresented: $showingLoginView) {
+            LoginView()
+        }
+        .sheet(isPresented: $showingRegistrationView) {
+            RegistrationView()
         }
     }
     
@@ -63,7 +91,14 @@ struct CartView: View {
                         case .success(_):
                             showingOrderConfirmation = true
                         case .failure(let error):
-                            print("Order failed: \(error)")
+                            errorMessage = error.localizedDescription
+                            // Проверяем, является ли это ошибкой аутентификации
+                            if case .authenticationRequired = error {
+                                isAuthenticationError = true
+                            } else {
+                                isAuthenticationError = false
+                            }
+                            showingError = true
                         }
                     }
                 }) {

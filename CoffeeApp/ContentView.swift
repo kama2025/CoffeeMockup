@@ -20,9 +20,9 @@ struct ContentView: View {
                             if cartManager.totalItems > 0 {
                                 Text("\(cartManager.totalItems)")
                                     .font(DesignSystem.Typography.caption2)
-                                    .foregroundColor(ColorTheme.textOnPrimary)
+                                    .foregroundColor(.white)
                                     .frame(width: 18, height: 18)
-                                    .background(Circle().fill(ColorTheme.error))
+                                    .background(Circle().fill(.red))
                                     .offset(x: 8, y: -8)
                                     .scaleEffect(cartBadgeScale)
                                     .animation(.bouncy(duration: 0.5, extraBounce: 0.3), value: cartManager.totalItems)
@@ -42,7 +42,7 @@ struct ContentView: View {
                     Label("Профиль", systemImage: "person.fill")
                 }
         }
-        .accentColor(ColorTheme.primary)
+        .accentColor(.brown)
         .preferredColorScheme(.light)
     }
 }

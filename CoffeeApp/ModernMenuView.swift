@@ -7,7 +7,7 @@ struct ModernMenuView: View {
     @StateObject private var cartManager = ModernCartManager.shared
     @State private var searchText = ""
     @State private var selectedCategory: Category?
-    @State private var showingSearch = false
+
     
     var body: some View {
         NavigationStack {
@@ -33,7 +33,8 @@ struct ModernMenuView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await viewModel.refreshData()
             }
@@ -41,9 +42,10 @@ struct ModernMenuView: View {
         .onAppear {
             viewModel.loadData()
         }
-        .searchable(text: $searchText, isPresented: $showingSearch)
-        .onChange(of: searchText) { _ in
-            viewModel.searchProducts(query: searchText)
+        .searchable(text: $searchText, prompt: "Поиск товаров...")
+
+        .onChange(of: searchText) { _, newValue in
+            viewModel.searchProducts(query: newValue)
         }
     }
     
@@ -64,17 +66,7 @@ struct ModernMenuView: View {
                 
                 Spacer()
                 
-                Button(action: { showingSearch.toggle() }) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.title2)
-                        .foregroundColor(DesignSystem.primaryFallback)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(DesignSystem.surfaceFallback)
-                                .shadow(color: ColorTheme.shadowLight, radius: 4, x: 0, y: 2)
-                        )
-                }
+
             }
             .padding(.horizontal, DesignSystem.Spacing.md)
             .padding(.top, DesignSystem.Spacing.sm)
@@ -90,32 +82,44 @@ struct ModernMenuView: View {
     // MARK: - Categories Scroll
     
     private var categoriesScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DesignSystem.Spacing.md) {
-                // All Categories Button
-                CategoryButton(
-                    title: "Все",
-                    icon: "square.grid.2x2",
-                    isSelected: selectedCategory == nil
-                ) {
-                    selectedCategory = nil
-                    viewModel.loadProducts(categoryId: nil)
-                }
-                
-                // Category Buttons
-                ForEach(viewModel.categories) { category in
+        // Контейнер с жёстким ограничением высоты
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DesignSystem.Spacing.md) {
+                    // All Categories Button
                     CategoryButton(
-                        title: category.name,
-                        icon: category.icon,
-                        isSelected: selectedCategory?.id == category.id
+                        title: "Все",
+                        icon: "square.grid.2x2",
+                        isSelected: selectedCategory == nil
                     ) {
-                        selectedCategory = category
-                        viewModel.loadProducts(categoryId: category.id)
+                        selectedCategory = nil
+                        viewModel.selectedCategory = nil
+                        viewModel.loadProducts(categoryId: nil)
+                    }
+                    
+                    // Category Buttons
+                    ForEach(viewModel.categories) { category in
+                        CategoryButton(
+                            title: category.name,
+                            icon: category.icon,
+                            isSelected: selectedCategory?.id == category.id
+                        ) {
+                            selectedCategory = category
+                            viewModel.selectedCategory = category
+                            viewModel.loadProducts(categoryId: category.id)
+                        }
                     }
                 }
+                .padding(.horizontal, DesignSystem.Spacing.md)
             }
-            .padding(.horizontal, DesignSystem.Spacing.md)
+            .scrollDisabled(false)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
+        .frame(height: 52) // Увеличил до 52pt для красоты (44pt кнопки + 8pt запас)
+        .frame(maxHeight: 52) // Жёсткое максимальное ограничение
+        .clipped() // Обрезка за границами
+        .background(Color.clear) // Прозрачный фон для отладки
+        .contentShape(Rectangle()) // Только прямоугольная область реагирует на жесты
     }
     
     // MARK: - Content View
@@ -261,6 +265,7 @@ struct CategoryButton: View {
 struct FeaturedProductCard: View {
     let product: Product
     let onAddToCart: () -> Void
+    @State private var isPressed = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
@@ -302,24 +307,59 @@ struct FeaturedProductCard: View {
                     Spacer()
                     
                     Button(action: {
-                        // Haptic feedback
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        // Enhanced animation sequence
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)) {
+                            isPressed = true
+                        }
+                        
+                        // Enhanced haptic feedback
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                        impactFeedback.prepare()
                         impactFeedback.impactOccurred()
                         
                         // Call the action
                         onAddToCart()
+                        
+                        // Longer animation with pop effect
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.5, blendDuration: 0.2)) {
+                                isPressed = false
+                            }
+                        }
                     }) {
-                        Image(systemName: "plus")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(DesignSystem.primaryFallback)
-                            )
+                        ZStack {
+                            // Background circle with scale animation and shadow
+                            Circle()
+                                .fill(isPressed ? Color.green : DesignSystem.primaryFallback)
+                                .scaleEffect(isPressed ? 1.4 : 1.0)
+                                .shadow(
+                                    color: isPressed ? Color.green.opacity(0.5) : DesignSystem.primaryFallback.opacity(0.4),
+                                    radius: isPressed ? 12 : 6,
+                                    x: 0,
+                                    y: isPressed ? 8 : 3
+                                )
+                            
+                            // Icon with animation
+                            ZStack {
+                                Image(systemName: "plus")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .opacity(isPressed ? 0 : 1)
+                                    .scaleEffect(isPressed ? 0.5 : 1.0)
+                                    .rotationEffect(.degrees(isPressed ? -90 : 0))
+                                
+                                Image(systemName: "checkmark")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .opacity(isPressed ? 1 : 0)
+                                    .scaleEffect(isPressed ? 1.0 : 1.5)
+                                    .rotationEffect(.degrees(isPressed ? 0 : 90))
+                            }
+                        }
+                        .frame(width: 32, height: 32)
                     }
-                    .scaleEffect(1.0)
-                    .animation(DesignSystem.Animation.bounce, value: true)
                 }
             }
         }
@@ -376,34 +416,58 @@ struct ProductCard: View {
                     Spacer()
                     
                     Button(action: {
-                        withAnimation(DesignSystem.Animation.bounce) {
+                        // Enhanced animation sequence
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.2)) {
                             isPressed = true
                         }
                         
-                        // Haptic feedback
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        // Enhanced haptic feedback
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                        impactFeedback.prepare()
                         impactFeedback.impactOccurred()
                         
                         // Call the action
                         onAddToCart()
                         
-                        // Reset animation
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            withAnimation(DesignSystem.Animation.spring) {
+                        // Longer animation with pop effect
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.5, blendDuration: 0.2)) {
                                 isPressed = false
                             }
                         }
                     }) {
-                        Image(systemName: "plus")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                Circle()
-                                    .fill(DesignSystem.primaryFallback)
-                                    .scaleEffect(isPressed ? 0.9 : 1.0)
-                            )
+                        ZStack {
+                            // Background circle with scale animation
+                            Circle()
+                                .fill(isPressed ? Color.green : DesignSystem.primaryFallback)
+                                .scaleEffect(isPressed ? 1.3 : 1.0)
+                                .shadow(
+                                    color: isPressed ? Color.green.opacity(0.4) : DesignSystem.primaryFallback.opacity(0.3),
+                                    radius: isPressed ? 8 : 4,
+                                    x: 0,
+                                    y: isPressed ? 6 : 2
+                                )
+                            
+                            // Icon with animation
+                            ZStack {
+                                Image(systemName: "plus")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .opacity(isPressed ? 0 : 1)
+                                    .scaleEffect(isPressed ? 0.5 : 1.0)
+                                    .rotationEffect(.degrees(isPressed ? -90 : 0))
+                                
+                                Image(systemName: "checkmark")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .opacity(isPressed ? 1 : 0)
+                                    .scaleEffect(isPressed ? 1.0 : 1.5)
+                                    .rotationEffect(.degrees(isPressed ? 0 : 90))
+                            }
+                        }
+                        .frame(width: 28, height: 28)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -425,6 +489,7 @@ class MenuViewModel: ObservableObject {
     
     private let apiService = APIService.shared
     private var cancellables = Set<AnyCancellable>()
+    var selectedCategory: Category?
     
     enum LoadingState {
         case loading
@@ -480,8 +545,9 @@ class MenuViewModel: ObservableObject {
     
     func searchProducts(query: String) {
         if query.isEmpty {
-            loadProducts(categoryId: nil)
+            loadProducts(categoryId: selectedCategory?.id)
         } else {
+            // Используем серверный поиск
             apiService.fetchProducts(search: query)
                 .receive(on: DispatchQueue.main)
                 .sink(

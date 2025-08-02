@@ -26,9 +26,9 @@ struct Category: Identifiable, Codable {
     
     enum CodingKeys: String, CodingKey {
         case id, name, icon
-        case displayOrder = "display_order"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case displayOrder = "displayOrder"
+        case createdAt = "createdAt"
+        case updatedAt = "updatedAt"
     }
 }
 
@@ -48,12 +48,12 @@ struct Product: Identifiable, Codable {
     
     enum CodingKeys: String, CodingKey {
         case id, name, description, price, available, featured
-        case categoryId = "category_id"
-        case imageUrl = "image_url"
+        case categoryId = "categoryId"
+        case imageUrl = "imageUrl"
         case categoryName = "category_name"
         case categoryIcon = "category_icon"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case createdAt = "createdAt"
+        case updatedAt = "updatedAt"
     }
     
     var formattedPrice: String {
@@ -75,11 +75,11 @@ struct OrderItem: Identifiable, Codable {
     
     enum CodingKeys: String, CodingKey {
         case id, quantity, price
-        case orderId = "order_id"
-        case productId = "product_id"
-        case productName = "product_name"
-        case productDescription = "product_description"
-        case createdAt = "created_at"
+        case orderId = "orderId"
+        case productId = "productId"
+        case productName = "productName"
+        case productDescription = "productDescription"
+        case createdAt = "createdAt"
     }
     
     var totalPrice: Double {
@@ -101,12 +101,12 @@ struct CreateOrderRequest: Codable {
     
     enum CodingKeys: String, CodingKey {
         case items, notes
-        case customerName = "customer_name"
-        case customerPhone = "customer_phone"
+        case customerName = "customerName"
+        case customerPhone = "customerPhone"
     }
 }
 
-struct OrderAPIResponse: Codable {
+struct OrderCreateResponse: Codable {
     let id: Int
     let orderNumber: String
     let totalPrice: Double
@@ -149,7 +149,7 @@ struct OrderItemRequest: Codable {
     let quantity: Int
     
     enum CodingKeys: String, CodingKey {
-        case productId = "product_id"
+        case productId = "productId"
         case quantity
     }
 }
@@ -159,8 +159,13 @@ struct OrderItemRequest: Codable {
 class APIService: ObservableObject {
     static let shared = APIService()
     
-    private let baseURL = "http://192.168.31.118:3000/api"
-    private let session = URLSession.shared
+    private let baseURL = "http://localhost:3000/api"
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30.0  // 30 секунд вместо стандартных 60
+        config.timeoutIntervalForResource = 60.0
+        return URLSession(configuration: config)
+    }()
     private var cancellables = Set<AnyCancellable>()
     
     private init() {}
@@ -188,10 +193,20 @@ class APIService: ObservableObject {
             request.httpBody = body
         }
         
+        // Добавляем логирование для отладки
+        print("🌐 API Request: \(method.rawValue) \(url.absoluteString)")
+        
         return session.dataTaskPublisher(for: request)
-            .map(\.data)
+            .map { data, response in
+                print("📡 API Response received: \(data.count) bytes")
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("📊 HTTP Status: \(httpResponse.statusCode)")
+                }
+                return data
+            }
             .decode(type: APIResponse<T>.self, decoder: JSONDecoder())
             .mapError { error in
+                print("❌ API Error: \(error.localizedDescription)")
                 if error is DecodingError {
                     return APIError.decodingError
                 } else {
@@ -288,35 +303,65 @@ class APIService: ObservableObject {
         items: [CartItem],
         customerName: String? = nil,
         customerPhone: String? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        authToken: String? = nil
     ) -> AnyPublisher<Order, APIError> {
-        
-        let orderItems = items.map { item in
-            OrderItemRequest(
-                productId: item.menuItem.productId ?? 0,
-                quantity: item.quantity
-            )
+        guard let url = URL(string: "\(baseURL)/orders") else {
+            return Fail(error: APIError.invalidURL)
+                .eraseToAnyPublisher()
         }
         
-        let requestBody = CreateOrderRequest(
-            items: orderItems,
-            customerName: customerName,
-            customerPhone: customerPhone,
-            notes: notes
-        )
+        // Создаем запрос с данными заказа
+        let orderData: [String: Any] = [
+            "items": items.map { item in
+                [
+                    "productId": item.menuItem.productId ?? 1,
+                    "quantity": item.quantity
+                ]
+            },
+            "customerName": customerName ?? "",
+            "customerPhone": customerPhone ?? "",
+            "notes": notes ?? ""
+        ]
         
-        guard let bodyData = try? JSONEncoder().encode(requestBody) else {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Добавляем авторизационный токен, если он есть
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: orderData)
+        } catch {
             return Fail(error: APIError.encodingError)
                 .eraseToAnyPublisher()
         }
         
-        let publisher: AnyPublisher<APIResponse<OrderAPIResponse>, APIError> = request(endpoint: "/orders", method: .POST, body: bodyData)
-        return publisher
-            .compactMap { response in
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: APIResponse<OrderCreateResponse>.self, decoder: JSONDecoder())
+            .tryMap { response in
                 if response.success, let orderData = response.data {
-                    return self.convertToOrder(from: orderData, cartItems: items)
+                    return Order(
+                        id: UUID(),
+                        number: orderData.id,
+                        items: items,
+                        totalPrice: Int(orderData.totalPrice),
+                        status: .placed,
+                        date: Date()
+                    )
                 } else {
-                    return nil
+                    throw APIError.serverError(response.message ?? "Ошибка создания заказа")
+                }
+            }
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                } else {
+                    return APIError.decodingError
                 }
             }
             .eraseToAnyPublisher()
@@ -370,7 +415,7 @@ class APIService: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func convertToOrder(from apiResponse: OrderAPIResponse, cartItems: [CartItem]) -> Order {
+    private func convertToOrder(from apiResponse: OrderCreateResponse, cartItems: [CartItem]) -> Order {
         let dateFormatter = ISO8601DateFormatter()
         let date = dateFormatter.date(from: apiResponse.createdAt) ?? Date()
         
@@ -402,6 +447,7 @@ enum APIError: Error, LocalizedError {
     case decodingError
     case encodingError
     case serverError(String)
+    case authenticationRequired(String)
     
     var errorDescription: String? {
         switch self {
@@ -415,6 +461,8 @@ enum APIError: Error, LocalizedError {
             return "Ошибка кодирования данных"
         case .serverError(let message):
             return "Ошибка сервера: \(message)"
+        case .authenticationRequired(let message):
+            return message
         }
     }
 }

@@ -36,8 +36,9 @@ class ModernCartManager: ObservableObject {
             cartItems.append(cartItem)
         }
         
-        // Add haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        // Add enhanced haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.prepare()
         impactFeedback.impactOccurred()
     }
     
@@ -75,8 +76,9 @@ class ModernCartManager: ObservableObject {
             cartItems.append(cartItem)
         }
         
-        // Add haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        // Add enhanced haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.prepare()
         impactFeedback.impactOccurred()
     }
     
@@ -125,13 +127,25 @@ class ModernCartManager: ObservableObject {
             return
         }
         
+        // Проверяем, что пользователь не в гостевом режиме
+        let authService = AuthService.shared
+        guard !authService.isGuestMode else {
+            completion(.failure(.authenticationRequired("Для оформления заказа необходимо войти в аккаунт")))
+            return
+        }
+        
         isLoading = true
+        
+        // Получаем информацию о пользователе, если он авторизован
+        let finalCustomerName = customerName ?? authService.currentUser?.name
+        let finalCustomerPhone = customerPhone ?? authService.currentUser?.phone
         
         apiService.createOrder(
             items: cartItems,
-            customerName: customerName,
-            customerPhone: customerPhone,
-            notes: notes
+            customerName: finalCustomerName,
+            customerPhone: finalCustomerPhone,
+            notes: notes,
+            authToken: authService.getToken() // Передаем токен для связи с пользователем
         )
         .receive(on: DispatchQueue.main)
         .sink(
@@ -146,6 +160,12 @@ class ModernCartManager: ObservableObject {
                 self?.orderHistory.insert(order, at: 0)
                 self?.saveOrderHistory()
                 self?.clearCart()
+                
+                // Обновляем статистику пользователя, если он авторизован
+                if let user = authService.currentUser {
+                    // В реальном приложении здесь можно было бы обновить статистику пользователя
+                    print("Заказ создан для пользователя: \(user.name)")
+                }
                 
                 // Add success haptic feedback
                 let successFeedback = UINotificationFeedbackGenerator()
@@ -201,10 +221,15 @@ class ModernCartManager: ObservableObject {
 // MARK: - Data Types
 
 struct CartItem: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let menuItem: MenuItem
     var quantity: Int
     
+    enum CodingKeys: String, CodingKey {
+        case menuItem
+        case quantity
+    }
+
     var totalPrice: Int {
         menuItem.price * quantity
     }

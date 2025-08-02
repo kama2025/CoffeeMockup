@@ -65,21 +65,21 @@ protocol ColorThemeProtocol {
 }
 
 struct CoffeeTheme: ColorThemeProtocol {  //Настройка цветов
-    let primary = Color(hex: "#024059")! // Кофейный
-    let primaryLight = Color(hex: "#704F38")!
-    let primaryDark = Color(hex: "#4D3319")!
+    let primary = Color(red: 0.40, green: 0.26, blue: 0.13) // Кофейный
+    let primaryLight = Color(red: 0.50, green: 0.36, blue: 0.23)
+    let primaryDark = Color(red: 0.30, green: 0.16, blue: 0.03)
     
-    let accent = Color(hex: "#026873")! // Золотистый
-    let accentLight = Color(hex: "#FACC66")!
-    let accentDark = Color(hex: "#D9A621")!
+    let accent = Color(red: 0.96, green: 0.73, blue: 0.29) // Золотистый
+    let accentLight = Color(red: 0.98, green: 0.83, blue: 0.39)
+    let accentDark = Color(red: 0.86, green: 0.63, blue: 0.19)
     
-    let background = Color(hex: "#03A64A")!
-    let backgroundSecondary = Color(hex: "#FEFAF5")!
+    let background = Color(red: 0.97, green: 0.95, blue: 0.92)
+    let backgroundSecondary = Color(red: 0.99, green: 0.98, blue: 0.96)
     let surface = Color.white
     
-    let textPrimary = Color(hex: "#025940")!
-    let textSecondary = Color(hex: "#402E21")!.opacity(0.7)
-    let textTertiary = Color(hex: "#402E21")!.opacity(0.5)
+    let textPrimary = Color(red: 0.20, green: 0.10, blue: 0.05)
+    let textSecondary = Color(red: 0.40, green: 0.26, blue: 0.13).opacity(0.7)
+    let textTertiary = Color(red: 0.40, green: 0.26, blue: 0.13).opacity(0.5)
     let textOnPrimary = Color.white
     
     let success = Color.green

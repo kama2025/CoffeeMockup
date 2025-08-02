@@ -2,13 +2,16 @@ import SwiftUI
 
 struct OrdersView: View {
     @ObservedObject var cartManager = ModernCartManager.shared
+    @EnvironmentObject var authService: AuthService
     
     var body: some View {
         NavigationStack {
             ZStack {
                 AppConfig.backgroundColor.ignoresSafeArea()
                 
-                if cartManager.orderHistory.isEmpty {
+                if authService.isGuestMode || authService.currentUser == nil {
+                    GuestOrdersView()
+                } else if cartManager.orderHistory.isEmpty {
                     EmptyOrdersView()
                 } else {
                     OrdersList()
@@ -28,6 +31,44 @@ struct OrdersView: View {
                 }
             }
             .padding()
+        }
+    }
+}
+
+struct GuestOrdersView: View {
+    @EnvironmentObject var authService: AuthService
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "person.badge.key.fill")
+                .font(.system(size: 60))
+                .foregroundColor(AppConfig.textColor.opacity(0.3))
+            
+            VStack(spacing: 12) {
+                Text("Требуется авторизация")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(AppConfig.textColor)
+                
+                Text("Войдите в аккаунт, чтобы видеть историю заказов")
+                    .font(.body)
+                    .foregroundColor(AppConfig.textColor.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            
+            Button(action: {
+                authService.isGuestMode = false
+            }) {
+                Text("Войти в аккаунт")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(AppConfig.accentColor)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal, 32)
         }
     }
 }

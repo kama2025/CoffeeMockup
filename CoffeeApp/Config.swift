@@ -50,12 +50,19 @@ struct MenuCategory: Codable {
 }
 
 struct MenuItem: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     var productId: Int?  // For API mapping
     let name: String
     let price: Int
     let description: String
     
+    enum CodingKeys: String, CodingKey {
+        case productId
+        case name
+        case price
+        case description
+    }
+
     var formattedPrice: String {
         return "\(price) ₽"
     }
