@@ -35,9 +35,7 @@ struct ModernMenuView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .refreshable {
-                await viewModel.refreshData()
-            }
+            // refreshable перемещено внутрь contentView
         }
         .onAppear {
             viewModel.loadData()
@@ -137,6 +135,9 @@ struct ModernMenuView: View {
             }
             .padding(.horizontal, DesignSystem.Spacing.md)
             .padding(.bottom, 100) // Space for tab bar
+        }
+        .refreshable {
+            await viewModel.refreshData()
         }
     }
     
